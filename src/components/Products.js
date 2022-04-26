@@ -7,6 +7,7 @@ import {
 } from "@mui/material";
 import { Box } from "@mui/system";
 import axios from "axios";
+import Cart from "./Cart";
 import { useSnackbar } from "notistack";
 import React, { useEffect, useState } from "react";
 import { config } from "../App";
@@ -19,6 +20,13 @@ import ProductCard from "./ProductCard";
  * @typedef {Object} Product - Data on product available to buy
  *
  * @property {string} name - The name or title of the product
+
+
+/**
+ * @typedef {Object} CartItem -  - Data on product added to cart
+ * 
+ * @property {string} name - The name or title of the product in cart
+ * @property {string} qty - The quantity of product added to cart
  * @property {string} category - The category that the product belongs to
  * @property {number} cost - The price to buy the product
  * @property {number} rating - The aggregate rating of the product (integer out of five)
@@ -27,11 +35,12 @@ import ProductCard from "./ProductCard";
  */
 
 const Products = () => {
+  const token = localStorage.getItem("token");
   const [productData, setProductData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const { enqueueSnackbar } = useSnackbar();
-  const [filteredProductData,setFilteredProductData] = useState([]);
-  const [debounceTimeout,setDebounceTimeout] = useState(null);
+  const [filteredProductData, setFilteredProductData] = useState([]);
+  const [debounceTimeout, setDebounceTimeout] = useState(null);
   // TODO: CRIO_TASK_MODULE_PRODUCTS - Fetch products data and store it
   /**
    * Make API call to get the products list and store it to display the products
@@ -108,7 +117,9 @@ const Products = () => {
   const performSearch = async (text) => {
     setIsLoading(true);
     try {
-      const res = await axios.get(`${config.endpoint}/products/search?value=${text}`);
+      const res = await axios.get(
+        `${config.endpoint}/products/search?value=${text}`
+      );
       const data = await res.data;
       console.log(data);
       setFilteredProductData(data);
@@ -138,37 +149,47 @@ const Products = () => {
    */
   const debounceSearch = (event, debounceTimeout) => {
     const value = event.target.value;
-    if(debounceTimeout){
+    if (debounceTimeout) {
       clearTimeout(debounceTimeout);
     }
-    const timeout = setTimeout(async() => {
+    const timeout = setTimeout(async () => {
       await performSearch(value);
-    },500);
+    }, 500);
     setDebounceTimeout(timeout);
   };
 
   useEffect(() => {
     performAPICall();
   }, []);
+  const addToCart = (token, productId) => {
+    if (!token) {
+      enqueueSnackbar("Please login to add items to the cart", {
+        variant: "warning",
+      });
+      return;
+    }
+    console.log("Product added to cart", productId);
+  };
   return (
     <div>
       <Header>
         {/* TODO: CRIO_TASK_MODULE_PRODUCTS - Display search bar in the header for Products page */}
-        
+
         <TextField
-        className="search-desktop"
-        size="small"
-        InputProps={{
-          className:"search",
-          endAdornment: (
-            <InputAdornment position="end">
-              <Search color="primary" />
-            </InputAdornment>
-          ),
-        }}
-        placeholder="Search for items/categories"
-        name="search" onChange={(e) => debounceSearch(e,debounceTimeout)}
-      />
+          className="search-desktop"
+          size="small"
+          InputProps={{
+            className: "search",
+            endAdornment: (
+              <InputAdornment position="end">
+                <Search color="primary" />
+              </InputAdornment>
+            ),
+          }}
+          placeholder="Search for items/categories"
+          name="search"
+          onChange={(e) => debounceSearch(e, debounceTimeout)}
+        />
       </Header>
 
       {/* Search view for mobiles */}
@@ -184,39 +205,50 @@ const Products = () => {
           ),
         }}
         placeholder="Search for items/categories"
-        name="search" 
-        onChange={(e) => debounceSearch(e,debounceTimeout)}
+        name="search"
+        onChange={(e) => debounceSearch(e, debounceTimeout)}
       />
       <Grid container>
-        <Grid item className="product-grid">
+        <Grid item className="product-grid" md={token ? 9 : 12}>
           <Box className="hero">
             <p className="hero-heading">
               India’s <span className="hero-highlight">FASTEST DELIVERY</span>{" "}
               to your door step
             </p>
           </Box>
+          {isLoading ? (
+            <Box className="loading">
+              <CircularProgress />
+              <h4>Loading Products...</h4>
+            </Box>
+          ) : (
+            <Grid container spacing={2} marginY="1rem" paddingX="1rem">
+              {filteredProductData.length ? (
+                filteredProductData.map((product) => {
+                  return (
+                    <Grid item xs={6} md={3} key={product._id}>
+                      <ProductCard
+                        product={product}
+                        handleAddToCart={() => addToCart(token, product._id)}
+                      />
+                    </Grid>
+                  );
+                })
+              ) : (
+                <Box className="loading">
+                  <SentimentDissatisfied color="action" />
+                  <h4 style={{ color: "#636363" }}>No products found</h4>
+                </Box>
+              )}
+            </Grid>
+          )}
         </Grid>
-        {isLoading ? (
-          <Box className="loading"
-          >
-            <CircularProgress />
-            <h4>Loading Products...</h4>
-          </Box>
-        ) : (
-          <Grid container spacing={2} marginY="1rem" paddingX="1rem">
-            {filteredProductData.length?filteredProductData.map((product) => {
-              return (
-                <Grid item xs={6} md={3} key={product._id}>
-                  <ProductCard product={product} handleAddToCart={()=>{
-                    console.log('Added To Cart')
-                  }}/>
-                </Grid>
-              );
-            }):<Box className="loading"><SentimentDissatisfied color="action"/><h4 style={{color:"#636363"}}>No products found</h4></Box>}
+        {token ? (
+          <Grid item xs={12} md={3} bgcolor="#E9F5E1">
+            <Cart />
           </Grid>
-        )}
+        ) : null}
       </Grid>
-
       <Footer />
     </div>
   );
