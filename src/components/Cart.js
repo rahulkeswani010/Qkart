@@ -48,6 +48,16 @@ import "./Cart.css";
  *
  */
 export const generateCartItemsFrom = (cartData, productsData) => {
+  
+  // FIXME - Add unit tests for each of these pure functions
+  if (!cartData) return;
+
+  const nextCart = cartData.map((item) => ({
+    ...item,
+    ...productsData.find((product) => item.productId === product._id),
+  }));
+
+  return nextCart;
 };
 
 /**
@@ -61,9 +71,34 @@ export const generateCartItemsFrom = (cartData, productsData) => {
  *
  */
 export const getTotalCartValue = (items = []) => {
+  
+  if (!items.length) return 0;
+  const total = items
+    .map((item) => item.cost * item.qty)
+    .reduce((total, n) => total + n);
+  return total;
 };
 
+// TODO: CRIO_TASK_MODULE_CHECKOUT - Implement function to return total cart quantity
+/**
+ * Return the sum of quantities of all products added to the cart
+ *
+ * @param { Array.<CartItem> } items
+ *    Array of objects with complete data on products in cart
+ *
+ * @returns { Number }
+ *    Total quantity of products added to the cart
+ *
+ */
+export const getTotalItems = (items = []) => {
+  
+  if (!items.length) return 0;
+  const total = items.map((item) => item.qty).reduce((total, n) => total + n);
+  return total;
+ 
+};
 
+// TODO: CRIO_TASK_MODULE_CHECKOUT - Add static quantity view for Checkout page cart
 /**
  * Component to display the current quantity for a product and + and - buttons to update product quantity on cart
  * 
@@ -76,13 +111,23 @@ export const getTotalCartValue = (items = []) => {
  * @param {Function} handleDelete
  *    Handler function which reduces the quantity of a product in cart by 1
  * 
+ * @param {Boolean} isReadOnly
+ *    If product quantity on cart is to be displayed as read only without the + - options to change quantity
  * 
  */
 const ItemQuantity = ({
   value,
   handleAdd,
   handleDelete,
+  
+  isReadOnly,
+ 
 }) => {
+  
+  if (isReadOnly) {
+    return <Box>Qty: {value}</Box>;
+  }
+ 
   return (
     <Stack direction="row" alignItems="center">
       <IconButton size="small" color="primary" onClick={handleDelete}>
@@ -110,13 +155,27 @@ const ItemQuantity = ({
  * @param {Function} handleDelete
  *    Current quantity of product in cart
  * 
+ * @param {Boolean} isReadOnly
+ *    If product quantity on cart is to be displayed as read only without the + - options to change quantity
  * 
  */
 const Cart = ({
   products,
   items = [],
   handleQuantity,
+  
+  hasCheckoutButton = false,
+  
+  isReadOnly = false,
+ 
 }) => {
+  
+  const token = localStorage.getItem("token");
+  const history = useHistory();
+
+  const routeToCheckout = () => {
+    history.push("/checkout");
+  };
 
   if (!items.length) {
     return (
@@ -133,6 +192,64 @@ const Cart = ({
     <>
       <Box className="cart">
         {/* TODO: CRIO_TASK_MODULE_CART - Display view for each cart item with non-zero quantity */}
+        {items.map((item) => (
+          <Box key={item.productId}>
+            {item.qty > 0 ? (
+              <Box display="flex" alignItems="flex-start" padding="1rem">
+                <Box className="image-container">
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    width="100%"
+                    height="100%"
+                  />
+                </Box>
+                <Box
+                  display="flex"
+                  flexDirection="column"
+                  justifyContent="space-between"
+                  height="6rem"
+                  paddingX="1rem"
+                >
+                  <div>{item.name}</div>
+                  <Box
+                    display="flex"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <ItemQuantity
+                      handleAdd={async () => {
+                        await handleQuantity(
+                          token,
+                          items,
+                          products,
+                          item.productId,
+                          item.qty + 1
+                        );
+                      }}
+                      handleDelete={async () => {
+                        await handleQuantity(
+                          token,
+                          items,
+                          products,
+                          item.productId,
+                          item.qty - 1
+                        );
+                      }}
+                      value={item.qty}
+                      
+                      isReadOnly={isReadOnly}
+                     
+                    />
+                    <Box padding="0.5rem" fontWeight="700">
+                      ${item.cost}
+                    </Box>
+                  </Box>
+                </Box>
+              </Box>
+            ) : null}
+          </Box>
+        ))}
         <Box
           padding="1rem"
           display="flex"
@@ -152,18 +269,41 @@ const Cart = ({
             ${getTotalCartValue(items)}
           </Box>
         </Box>
-
-        <Box display="flex" justifyContent="flex-end" className="cart-footer">
-          <Button
-            color="primary"
-            variant="contained"
-            startIcon={<ShoppingCart />}
-            className="checkout-btn"
-          >
-            Checkout
-          </Button>
-        </Box>
+        {hasCheckoutButton && (
+          <Box display="flex" justifyContent="flex-end" className="cart-footer">
+            <Button
+              color="primary"
+              variant="contained"
+              startIcon={<ShoppingCart />}
+              className="checkout-btn"
+              onClick={routeToCheckout}
+            >
+              Checkout
+            </Button>
+          </Box>
+        )}
       </Box>
+      {isReadOnly && (
+        <Box className="cart" padding="1rem">
+          <h2>Order Details</h2>
+          <Box className="cart-row">
+            <p>Products</p>
+            <p>{getTotalItems(items)}</p>
+          </Box>
+          <Box className="cart-row">
+            <p>Subtotal</p>
+            <p>${getTotalCartValue(items)}</p>
+          </Box>
+          <Box className="cart-row">
+            <p>Shipping Charges</p>
+            <p>$0</p>
+          </Box>
+          <Box className="cart-row" fontSize="1.25rem" fontWeight="700">
+            <p>Total</p>
+            <p>${getTotalCartValue(items)}</p>
+          </Box>
+        </Box>
+      )}
     </>
   );
 };
